@@ -5,7 +5,6 @@ const actionBtn = document.getElementById("actionBtn");
 const toggleBtn = document.getElementById("toggleFormatBtn");
 const downloadArea = document.getElementById("downloadArea");
 
-// FORMAT SWITCH
 toggleBtn.addEventListener("click", () => {
     if (currentFormat === "mp3") {
         currentFormat = "mp4";
@@ -18,17 +17,14 @@ toggleBtn.addEventListener("click", () => {
     }
 });
 
-// BUTTON CLICK
 actionBtn.addEventListener("click", convert);
 
-// ENTER KEY
 videoUrl.addEventListener("keydown", function (e) {
     if (e.key === "Enter") {
         convert();
     }
 });
 
-// CONVERT FUNCTION
 async function convert() {
     const url = videoUrl.value.trim();
 
@@ -78,7 +74,6 @@ async function convert() {
             </div>
         `;
 
-        // Düyməyə klik elədikdə faylı təkrar oynatmamaq üçün Brauzer Blob ilə endiririk
         document.getElementById("directDownloadBtn").addEventListener("click", async function() {
             const btn = this;
             btn.disabled = true;
@@ -103,7 +98,6 @@ async function convert() {
                 btn.textContent = `Download ${currentFormat.toUpperCase()}`;
                 btn.disabled = false;
             } catch (err) {
-                // Əgər brauzer blob bloqlayarsa son çarə olaraq linkə yönləndirir
                 window.location.href = data.download_url;
             }
         });

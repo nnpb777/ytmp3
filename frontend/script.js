@@ -171,7 +171,7 @@ async function convert() {
             <div class="download-box">
 
                 <div class="success">
-                    ✓ Hazırdır
+                    ✓ Ready
                 </div>
 
                 <div class="title">

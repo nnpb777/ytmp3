@@ -4,19 +4,27 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && apt-get install -y --no-install-recommends \
+       ffmpeg \
+       curl \
+       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Deno — yt-dlp üçün JavaScript runtime
+RUN curl -fsSL https://deno.land/install.sh | sh
+
+ENV DENO_INSTALL=/root/.deno
+ENV PATH="/root/.deno/bin:$PATH"
 
 WORKDIR /app
 
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+COPY backend/requirements.txt ./backend/requirements.txt
 
-COPY backend /app/backend
-COPY frontend /app/frontend
+RUN pip install --no-cache-dir -r ./backend/requirements.txt
 
-RUN mkdir -p /app/backend/downloads
+COPY backend ./backend
+COPY frontend ./frontend
 
-EXPOSE 8000
+RUN mkdir -p ./backend/downloads
 
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

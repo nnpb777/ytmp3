@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Deno JavaScript runtime
+# Deno
 RUN curl -fsSL https://deno.land/install.sh | sh
 
 ENV DENO_INSTALL=/root/.deno
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
 COPY frontend /app/frontend
 
-RUN mkdir -p /app/backend/downloads
+RUN mkdir -p /app/downloads
 
 EXPOSE 8000
 

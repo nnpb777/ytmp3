@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import re
 import requests
+from urllib.parse import quote
 
 app = FastAPI()
 
@@ -86,6 +87,48 @@ def convert_video(url: str, format: str = "mp3"):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Xəta baş verdi: {str(e)}")
+
+# BİRBAŞA YÜKLƏMƏ ENDPOINT-i
+@app.get("/download")
+def proxy_download(url: str, title: str = "media", format: str = "mp3"):
+    # Google Serverlərini "browser" olduğumuza inandırmaq üçün mükəmməl başlıqlar
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Referer": "https://www.youtube.com/",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1"
+    }
+    try:
+        req = requests.get(url, headers=headers, stream=True, timeout=15)
+        
+        # Əgər uğurla cavab gələrsə, faylı məcburi yükləmə başlığı ilə yönləndirir
+        if req.status_code == 200:
+            clean_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "download"
+            filename = f"{clean_title}.{format}"
+            encoded_filename = quote(filename)
+            
+            media_type = "audio/mpeg" if format == "mp3" else "video/mp4"
+            
+            res_headers = {
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+                "Content-Type": media_type
+            }
+            
+            if "Content-Length" in req.headers:
+                res_headers["Content-Length"] = req.headers["Content-Length"]
+
+            return StreamingResponse(
+                req.iter_content(chunk_size=1024 * 128),
+                headers=res_headers,
+                media_type=media_type
+            )
+        else:
+            # IP bloku olarsa əlavə error vermədən linkin özünə atır
+            return RedirectResponse(url=url)
+    except Exception:
+        return RedirectResponse(url=url)
 
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

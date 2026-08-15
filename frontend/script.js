@@ -84,7 +84,7 @@ async function convert() {
     if (!url) {
 
         showError(
-            "YouTube linkini daxil et."
+            "Enter YouTube link."
         );
 
         return;
@@ -97,7 +97,7 @@ async function convert() {
     ) {
 
         showError(
-            "Düzgün YouTube linki daxil et."
+            "Enter the correct YouTube link."
         );
 
         return;
@@ -119,8 +119,7 @@ async function convert() {
 
     downloadArea.innerHTML = `
         <div class="status">
-            YouTube videosu hazırlanır...<br>
-            Zəhmət olmasa gözlə.
+            Please wait. Your query is being processed.<br>
         </div>
     `;
 
@@ -148,7 +147,7 @@ async function convert() {
 
             throw new Error(
                 data.detail ||
-                "Yükləmə zamanı xəta baş verdi."
+                "An error occurred during the download."
             );
         }
 
@@ -156,7 +155,7 @@ async function convert() {
         if (data.status !== "success") {
 
             throw new Error(
-                "Fayl hazırlana bilmədi."
+                "Failed query"
             );
         }
 

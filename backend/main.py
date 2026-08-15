@@ -93,8 +93,19 @@ def convert_video(url: str, format: str = "mp3"):
 @app.get("/download-file")
 def download_file(url: str, title: str = "media", format: str = "mp3"):
     try:
-        req = requests.get(url, stream=True, timeout=30)
+        # Google Serverlərinin bloklamaması üçün brauzer User-Agent-i göndəririk
+        req_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Encoding": "identity",
+            "Connection": "keep-alive"
+        }
+
+        req = requests.get(url, headers=req_headers, stream=True, timeout=30)
         
+        if req.status_code != 200:
+            raise HTTPException(status_code=req.status_code, detail="Google serverindən fayl alına bilmədi.")
+
         clean_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "download"
         ext = "mp3" if format == "mp3" else "mp4"
         filename = f"{clean_title}.{ext}"
@@ -102,14 +113,18 @@ def download_file(url: str, title: str = "media", format: str = "mp3"):
         encoded_filename = quote(filename)
         media_type = "audio/mpeg" if format == "mp3" else "video/mp4"
 
-        headers = {
+        res_headers = {
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
             "Content-Type": media_type
         }
 
+        # Fayl həcmini başlığa əlavə edirik
+        if "Content-Length" in req.headers:
+            res_headers["Content-Length"] = req.headers["Content-Length"]
+
         return StreamingResponse(
-            req.iter_content(chunk_size=1024 * 64),
-            headers=headers,
+            req.iter_content(chunk_size=1024 * 128),
+            headers=res_headers,
             media_type=media_type
         )
     except Exception as e:

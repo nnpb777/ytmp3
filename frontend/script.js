@@ -33,19 +33,14 @@ async function convert() {
         return;
     }
 
-    if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
-        showError("Düzgün YouTube linki daxil edin.");
-        return;
-    }
-
     actionBtn.disabled = true;
     toggleBtn.disabled = true;
-    actionBtn.textContent = "Gözləyin...";
+    actionBtn.textContent = "Processing...";
 
     downloadArea.classList.remove("hidden");
     downloadArea.innerHTML = `
         <div class="status">
-            Məlumatlar emal olunur, zəhmət olmasa gözləyin...
+            Please wait. Fetching details via RapidAPI...
         </div>
     `;
 
@@ -63,23 +58,19 @@ async function convert() {
 
         downloadArea.innerHTML = `
             <div class="download-box">
-                <div class="success">✓ Hazırdır</div>
+                <div class="success">✓ Ready</div>
                 <div class="title">${escapeHtml(data.title)}</div>
                 <a 
-                    id="directLink" 
                     href="${data.download_url}" 
-                    class="download-button"
+                    target="_blank" 
                     rel="noopener noreferrer"
+                    class="download-button"
+                    download="${escapeHtml(data.title)}.${data.format}"
                 >
                     Download ${currentFormat.toUpperCase()}
                 </a>
             </div>
         `;
-
-        // Düyməyə tıklandıqda faylı pleyerə yönləndirmədən məcburi endirir
-        document.getElementById("directLink").addEventListener("click", function(e) {
-            // Cobalt tunnel linki olduğu üçün brauzer birbaşa endirməyə başlayacaq
-        });
 
     } catch (error) {
         console.error(error);

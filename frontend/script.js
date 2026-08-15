@@ -5,7 +5,6 @@ const actionBtn = document.getElementById("actionBtn");
 const toggleBtn = document.getElementById("toggleFormatBtn");
 const downloadArea = document.getElementById("downloadArea");
 
-// FORMAT SWITCH
 toggleBtn.addEventListener("click", () => {
     if (currentFormat === "mp3") {
         currentFormat = "mp4";
@@ -18,17 +17,14 @@ toggleBtn.addEventListener("click", () => {
     }
 });
 
-// BUTTON CLICK
 actionBtn.addEventListener("click", convert);
 
-// ENTER KEY
 videoUrl.addEventListener("keydown", function (e) {
     if (e.key === "Enter") {
         convert();
     }
 });
 
-// CONVERT FUNCTION
 async function convert() {
     const url = videoUrl.value.trim();
 
@@ -49,7 +45,7 @@ async function convert() {
     downloadArea.classList.remove("hidden");
     downloadArea.innerHTML = `
         <div class="status">
-            Məlumatlar alınır, zəhmət olmasa gözləyin...
+            Məlumatlar emal olunur, zəhmət olmasa gözləyin...
         </div>
     `;
 
@@ -69,18 +65,20 @@ async function convert() {
             <div class="download-box">
                 <div class="success">✓ Hazırdır</div>
                 <div class="title">${escapeHtml(data.title)}</div>
-                <button 
-                    id="startDownloadBtn" 
+                <a 
+                    id="directLink" 
+                    href="${data.download_url}" 
                     class="download-button"
+                    rel="noopener noreferrer"
                 >
-                    ${currentFormat.toUpperCase()} İndir
-                </button>
-                <div id="progressText" style="margin-top: 10px; font-size: 14px; color: #4caf50; font-weight: bold;"></div>
+                    Download ${currentFormat.toUpperCase()}
+                </a>
             </div>
         `;
 
-        document.getElementById("startDownloadBtn").addEventListener("click", function() {
-            startDirectDownload(data.download_url, data.title, data.format, this);
+        // Düyməyə tıklandıqda faylı pleyerə yönləndirmədən məcburi endirir
+        document.getElementById("directLink").addEventListener("click", function(e) {
+            // Cobalt tunnel linki olduğu üçün brauzer birbaşa endirməyə başlayacaq
         });
 
     } catch (error) {
@@ -90,98 +88,6 @@ async function convert() {
         actionBtn.disabled = false;
         toggleBtn.disabled = false;
         actionBtn.textContent = currentFormat === "mp3" ? "Get MP3" : "Get MP4";
-    }
-}
-
-// BİRBAŞA VƏ CORS PROXY İLƏ YÜKLƏMƏ FUNKSİYASI
-async function startDirectDownload(fileUrl, title, format, btnElement) {
-    btnElement.disabled = true;
-    btnElement.textContent = "Yüklənir...";
-    const progressText = document.getElementById("progressText");
-
-    // Brauzerin CORS blokunu aşmaq üçün proxy zənciri
-    const targetUrls = [
-        `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`,
-        fileUrl
-    ];
-
-    let response = null;
-
-    for (const url of targetUrls) {
-        try {
-            const res = await fetch(url, { referrerPolicy: "no-referrer" });
-            if (res.ok) {
-                response = res;
-                break;
-            }
-        } catch (e) {
-            console.warn("CORS attempt failed, trying next...", e);
-        }
-    }
-
-    if (!response) {
-        btnElement.disabled = false;
-        btnElement.textContent = "Yenidən cəhd et";
-        if (progressText) {
-            progressText.style.color = "#ff4d4d";
-            progressText.textContent = "Faylı almaq mümkün olmadı. Təkrar klikləyin.";
-        }
-        return;
-    }
-
-    try {
-        const contentLength = response.headers.get("content-length");
-        const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-        
-        const reader = response.body.getReader();
-        let receivedBytes = 0;
-        const chunks = [];
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            chunks.push(value);
-            receivedBytes += value.length;
-
-            if (totalBytes > 0 && progressText) {
-                const percent = Math.round((receivedBytes / totalBytes) * 100);
-                progressText.textContent = `Yüklənir: %${percent} (${(receivedBytes / (1024 * 1024)).toFixed(1)} MB)`;
-            } else if (progressText) {
-                progressText.textContent = `Yüklənir: ${(receivedBytes / (1024 * 1024)).toFixed(1)} MB`;
-            }
-        }
-
-        const mimeType = format === "mp3" ? "audio/mpeg" : "video/mp4";
-        const blob = new Blob(chunks, { type: mimeType });
-        
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.style.display = "none";
-        a.href = blobUrl;
-        a.download = `${title}.${format}`;
-        
-        document.body.appendChild(a);
-        a.click();
-        
-        setTimeout(() => {
-            window.URL.revokeObjectURL(blobUrl);
-            a.remove();
-        }, 1000);
-
-        btnElement.textContent = `${format.toUpperCase()} İndir`;
-        btnElement.disabled = false;
-        if (progressText) progressText.textContent = "✓ Yüklənmə tamamlandı!";
-
-    } catch (err) {
-        console.error("Download Error:", err);
-        btnElement.disabled = false;
-        btnElement.textContent = "Yenidən cəhd et";
-        if (progressText) {
-            progressText.style.color = "#ff4d4d";
-            progressText.textContent = "Xəta baş verdi. Linki yenidən yerləşdirib cəhd edin.";
-        }
     }
 }
 

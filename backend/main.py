@@ -1,283 +1,257 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
+
 import os
-import yt_dlp
-import uuid
 import re
+import uuid
+import threading
+import yt_dlp
+
 
 app = FastAPI()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
-DOWNLOAD_DIR = BASE_DIR / "backend" / "downloads"
-
-DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def clean_filename(name):
-    name = re.sub(r'[\\/*?:"<>|]', "", name)
-    name = re.sub(r"\s+", " ", name)
-    return name.strip()
-
-
-# =========================
-# FRONTEND
-# =========================
-
-app.mount(
-    "/static",
-    StaticFiles(directory=str(FRONTEND_DIR)),
-    name="static"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+
+# BgUtils servisinin Render-dəki public URL-i
+# Render-də environment variable kimi əlavə edəcəyik.
+POT_PROVIDER_URL = os.getenv("POT_PROVIDER_URL", "").rstrip("/")
+
+
+def clean_filename(name: str) -> str:
+    name = re.sub(r'[\\/*?:"<>|]', "", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name[:180] or "YouTube_Media"
+
+
+def build_ydl_options(format_type: str, output_template: str):
+    options = {
+        "outtmpl": output_template,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": False,
+        "retries": 3,
+        "fragment_retries": 3,
+        "concurrent_fragment_downloads": 4,
+    }
+
+    # PO Token Provider
+    if POT_PROVIDER_URL:
+        options["extractor_args"] = {
+            "youtubepot-bgutilhttp": {
+                "base_url": POT_PROVIDER_URL
+            }
+        }
+
+    if format_type == "mp3":
+        options.update({
+            "format": "bestaudio/best",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+        })
+
+    elif format_type == "mp4":
+        options.update({
+            "format": "bv*+ba/b",
+            "merge_output_format": "mp4",
+        })
+
+    else:
+        raise ValueError("Invalid format")
+
+    return options
 
 
 @app.get("/")
-def home():
+def index():
     return FileResponse(
-        str(FRONTEND_DIR / "index.html")
+        os.path.join(BASE_DIR, "frontend", "index.html")
     )
 
 
-# =========================
-# CONVERT
-# =========================
-
 @app.get("/convert")
-def convert(url: str, format: str = "mp3"):
+def convert_video(url: str, format: str = "mp3"):
 
     if not url:
         raise HTTPException(
             status_code=400,
-            detail="YouTube link daxil edilməyib."
+            detail="YouTube URL daxil edin."
         )
 
-    if format not in ["mp3", "mp4"]:
+    if format not in ("mp3", "mp4"):
         raise HTTPException(
             status_code=400,
-            detail="Format səhvdir."
+            detail="Format yalnız mp3 və ya mp4 ola bilər."
         )
 
-    if "youtube.com" not in url and "youtu.be" not in url:
-        raise HTTPException(
-            status_code=400,
-            detail="YouTube linki daxil edin."
-        )
-
-    job_id = uuid.uuid4().hex
+    unique_id = str(uuid.uuid4())[:12]
 
     try:
+        # Əvvəl videonun məlumatını alırıq
+        info_options = {
+            "quiet": True,
+            "no_warnings": False,
+            "noplaylist": True,
+        }
 
-        if format == "mp3":
-
-            output = str(
-                DOWNLOAD_DIR / f"{job_id}.%(ext)s"
-            )
-
-            options = {
-                "format": "bestaudio/best",
-                "outtmpl": output,
-                "noplaylist": True,
-
-                "quiet": False,
-                "no_warnings": False,
-
-                "postprocessors": [
-                    {
-                        "key": "FFmpegExtractAudio",
-                        "preferredcodec": "mp3",
-                        "preferredquality": "192",
-                    }
-                ],
-
-                "postprocessor_args": [
-                    "-ar", "44100",
-                    "-ac", "2"
-                ],
+        if POT_PROVIDER_URL:
+            info_options["extractor_args"] = {
+                "youtubepot-bgutilhttp": {
+                    "base_url": POT_PROVIDER_URL
+                }
             }
 
-        else:
+        with yt_dlp.YoutubeDL(info_options) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-            output = str(
-                DOWNLOAD_DIR / f"{job_id}.%(ext)s"
-            )
+        title = info.get("title") or "YouTube_Media"
+        clean_title = clean_filename(title)
 
-            options = {
-                "format":
-                    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/"
-                    "best[ext=mp4]/best",
+        extension = "mp3" if format == "mp3" else "mp4"
 
-                "outtmpl": output,
+        output_template = os.path.join(
+            DOWNLOAD_DIR,
+            f"{unique_id}.%(ext)s"
+        )
 
-                "merge_output_format": "mp4",
+        options = build_ydl_options(
+            format,
+            output_template
+        )
 
-                "noplaylist": True,
-
-                "quiet": False,
-                "no_warnings": False,
-            }
-
-
-        print("\n==============================")
-        print("DOWNLOAD STARTED")
-        print("URL:", url)
-        print("FORMAT:", format)
-        print("==============================\n")
-
-
+        # Faylı yüklə
         with yt_dlp.YoutubeDL(options) as ydl:
+            ydl.download([url])
 
-            info = ydl.extract_info(
-                url,
-                download=True
+        # Yaranmış faylı tap
+        possible_files = []
+
+        for filename in os.listdir(DOWNLOAD_DIR):
+            if filename.startswith(unique_id):
+                possible_files.append(filename)
+
+        if not possible_files:
+            raise Exception(
+                "Yükləmə tamamlandı, amma fayl tapılmadı."
             )
 
-            title = info.get(
-                "title",
-                "YouTube Media"
-            )
+        # MP3/MP4 faylını seç
+        selected_file = None
 
+        for filename in possible_files:
+            if filename.lower().endswith(f".{extension}"):
+                selected_file = filename
+                break
 
-        # =========================
-        # FIND RESULT FILE
-        # =========================
-
-        if format == "mp3":
-
-            file_path = (
-                DOWNLOAD_DIR /
-                f"{job_id}.mp3"
-            )
-
-        else:
-
-            file_path = (
-                DOWNLOAD_DIR /
-                f"{job_id}.mp4"
-            )
-
-
-        if not file_path.exists():
-
-            files = list(
-                DOWNLOAD_DIR.glob(
-                    f"{job_id}.*"
-                )
-            )
-
-            if not files:
-
-                raise HTTPException(
-                    status_code=500,
-                    detail="Fayl yaradılmadı."
-                )
-
-            file_path = files[0]
-
-
-        print("\nDOWNLOAD FINISHED:")
-        print(file_path)
-        print("==============================\n")
-
+        if not selected_file:
+            selected_file = possible_files[0]
 
         return {
             "status": "success",
-
             "title": title,
-
-            "filename":
-                clean_filename(title),
-
-            "file_key":
-                file_path.name,
-
-            "format":
-                format
+            "clean_title": clean_title,
+            "file_key": selected_file,
+            "format": format,
         }
-
 
     except Exception as e:
 
-        print("\nDOWNLOAD ERROR:")
-        print(str(e))
-        print("==============================\n")
+        error_text = str(e)
+
+        # istifadəçiyə çox uzun yt-dlp logu göstərməyək
+        if len(error_text) > 1200:
+            error_text = error_text[-1200:]
 
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=f"YouTube yükləmə xətası: {error_text}"
         )
 
 
-# =========================
-# DOWNLOAD FILE
-# =========================
+@app.get("/get-file/{file_key}")
+def get_file(file_key: str):
 
-@app.get("/download/{filename}")
-def download_file(filename: str):
-
-    # təhlükəsizlik
-    if (
-        ".." in filename
-        or "/" in filename
-        or "\\" in filename
-    ):
+    # Path traversal qoruması
+    if "/" in file_key or "\\" in file_key or ".." in file_key:
         raise HTTPException(
             status_code=400,
-            detail="Yanlış fayl."
+            detail="Yanlış fayl adı."
         )
 
-
-    file_path = (
-        DOWNLOAD_DIR / filename
+    file_path = os.path.join(
+        DOWNLOAD_DIR,
+        file_key
     )
 
-
-    if not file_path.exists():
-
+    if not os.path.isfile(file_path):
         raise HTTPException(
             status_code=404,
             detail="Fayl tapılmadı."
         )
 
+    extension = os.path.splitext(file_key)[1].lower()
 
-    if file_path.suffix.lower() not in [
-        ".mp3",
-        ".mp4"
-    ]:
+    if extension == ".mp3":
+        media_type = "audio/mpeg"
+    elif extension == ".mp4":
+        media_type = "video/mp4"
+    else:
+        media_type = "application/octet-stream"
 
-        raise HTTPException(
-            status_code=400,
-            detail="Fayl formatı dəstəklənmir."
-        )
+    # Download zamanı faylı sil
+    def delete_later():
+        import time
 
+        time.sleep(120)
+
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+
+    threading.Thread(
+        target=delete_later,
+        daemon=True
+    ).start()
+
+    download_name = file_key
 
     return FileResponse(
-        path=str(file_path),
-
-        filename=file_path.name,
-
-        media_type="application/octet-stream"
+        file_path,
+        media_type=media_type,
+        filename=download_name,
+        headers={
+            "Content-Disposition":
+                f'attachment; filename="{download_name}"'
+        }
     )
 
 
-# =========================
-# HEALTH
-# =========================
+# Frontend static faylları
+STATIC_DIR = os.path.join(BASE_DIR, "frontend")
 
-@app.get("/health")
-def health():
-
-    return {
-        "status": "online"
-    }
-
-# Production entrypoint:
-# The hosting provider supplies PORT; locally it defaults to 8000.
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "backend.main:app",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", "8000"))
+if os.path.isdir(STATIC_DIR):
+    app.mount(
+        "/static",
+        StaticFiles(directory=STATIC_DIR),
+        name="static"
     )

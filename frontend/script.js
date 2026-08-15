@@ -49,7 +49,7 @@ async function convert() {
     downloadArea.classList.remove("hidden");
     downloadArea.innerHTML = `
         <div class="status">
-            Please wait. Your query is being processed...
+            Please wait. Fetching video details...
         </div>
     `;
 
@@ -65,21 +65,48 @@ async function convert() {
             throw new Error("Failed query.");
         }
 
-        // Məcburi endirmə üçün backend proxy linki
-        const directDownloadUrl = `/download-file?url=${encodeURIComponent(data.download_url)}&title=${encodeURIComponent(data.title)}&format=${data.format}`;
-
         downloadArea.innerHTML = `
             <div class="download-box">
                 <div class="success">✓ Ready</div>
                 <div class="title">${escapeHtml(data.title)}</div>
-                <a 
-                    class="download-button" 
-                    href="${directDownloadUrl}"
+                <button 
+                    id="directDownloadBtn" 
+                    class="download-button"
                 >
                     Download ${currentFormat.toUpperCase()}
-                </a>
+                </button>
             </div>
         `;
+
+        // Düyməyə klik elədikdə faylı təkrar oynatmamaq üçün Brauzer Blob ilə endiririk
+        document.getElementById("directDownloadBtn").addEventListener("click", async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = "Downloading file...";
+
+            try {
+                const mediaRes = await fetch(data.download_url);
+                const blob = await mediaRes.blob();
+                
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = blobUrl;
+                a.download = `${data.title}.${data.format}`;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                window.URL.revokeObjectURL(blobUrl);
+                a.remove();
+                
+                btn.textContent = `Download ${currentFormat.toUpperCase()}`;
+                btn.disabled = false;
+            } catch (err) {
+                // Əgər brauzer blob bloqlayarsa son çarə olaraq linkə yönləndirir
+                window.location.href = data.download_url;
+            }
+        });
 
     } catch (error) {
         console.error(error);

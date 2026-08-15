@@ -1,0 +1,14 @@
+YT MP3 production package
+
+Local:
+  python -m uvicorn backend.main:app --reload
+
+Production Docker:
+  docker build -t ytmp3 .
+  docker run -p 8000:8000 ytmp3
+
+Open:
+  http://127.0.0.1:8000
+
+The Docker image contains FFmpeg and keeps the Python downloader code server-side.
+Do not use VS Code Live Server for this version.

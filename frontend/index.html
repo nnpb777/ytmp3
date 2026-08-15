@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>YT MP3</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+
+        <div class="logo">
+            <span class="yt">YT</span>
+            <span class="mp3">MP3</span>
+        </div>
+
+        <nav>
+            <a href="/">Home</a>
+            <a href="#faq">FAQ</a>
+            <a href="#addon">Add-On</a>
+            <a href="#bookmarklet">Bookmarklet</a>
+        </nav>
+
+    </header>
+
+
+    <!-- MAIN -->
+    <main>
+
+        <section class="converter">
+
+            <h1>
+                YouTube Downloader
+            </h1>
+
+            <p class="subtitle">
+                Download YouTube videos as MP3 or MP4
+            </p>
+
+
+            <!-- LABEL -->
+            <label
+                for="videoUrl"
+                class="label"
+            >
+                Paste your YouTube link
+            </label>
+
+
+            <!-- INPUT + BUTTON -->
+            <div class="input-row">
+
+                <input
+                    id="videoUrl"
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    autocomplete="off"
+                    spellcheck="false"
+                >
+
+                <button
+                    id="actionBtn"
+                    type="button"
+                >
+                    Get MP3
+                </button>
+
+            </div>
+
+
+            <!-- FORMAT SWITCH -->
+            <div class="switch-area">
+
+                <span>
+                    Or
+                </span>
+
+                <button
+                    id="toggleFormatBtn"
+                    type="button"
+                >
+                    download as MP4 (video)
+                </button>
+
+            </div>
+
+
+            <!-- DOWNLOAD / STATUS AREA -->
+            <div
+                id="downloadArea"
+                class="download-area hidden"
+            ></div>
+
+        </section>
+
+    </main>
+
+
+    <!-- FOOTER -->
+    <footer>
+
+        <p>
+            YT MP3
+        </p>
+
+    </footer>
+
+
+    <!-- JAVASCRIPT -->
+    <script src="/static/script.js"></script>
+
+</body>
+</html>

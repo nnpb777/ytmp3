@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import re
 import requests
+from urllib.parse import quote
 
 app = FastAPI()
 
@@ -88,6 +89,31 @@ def convert_video(url: str, format: str = "mp3"):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Xəta baş verdi: {str(e)}")
+
+@app.get("/download-file")
+def download_file(url: str, title: str = "media", format: str = "mp3"):
+    try:
+        req = requests.get(url, stream=True, timeout=30)
+        
+        clean_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "download"
+        ext = "mp3" if format == "mp3" else "mp4"
+        filename = f"{clean_title}.{ext}"
+        
+        encoded_filename = quote(filename)
+        media_type = "audio/mpeg" if format == "mp3" else "video/mp4"
+
+        headers = {
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+            "Content-Type": media_type
+        }
+
+        return StreamingResponse(
+            req.iter_content(chunk_size=1024 * 64),
+            headers=headers,
+            media_type=media_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fayl endirilərkən xəta baş verdi: {str(e)}")
 
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

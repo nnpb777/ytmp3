@@ -79,7 +79,6 @@ async function convert() {
             </div>
         `;
 
-        // Düyməyə basdıqda brauzeri başqa səhifəyə atmadan arxa fonda endiririk
         document.getElementById("startDownloadBtn").addEventListener("click", function() {
             startDirectDownload(data.download_url, data.title, data.format, this);
         });
@@ -94,23 +93,44 @@ async function convert() {
     }
 }
 
-// BİRBAŞA ENDİRMƏ FUNKSİYASI (Pleyerə keçidin qarşısını alır)
+// BİRBAŞA VƏ CORS PROXY İLƏ YÜKLƏMƏ FUNKSİYASI
 async function startDirectDownload(fileUrl, title, format, btnElement) {
     btnElement.disabled = true;
     btnElement.textContent = "Yüklənir...";
     const progressText = document.getElementById("progressText");
 
-    try {
-        // referrerPolicy: 'no-referrer' Google CDN-in bloklamasını keçmək üçündür
-        const response = await fetch(fileUrl, {
-            method: "GET",
-            referrerPolicy: "no-referrer"
-        });
+    // Brauzerin CORS blokunu aşmaq üçün proxy zənciri
+    const targetUrls = [
+        `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`,
+        fileUrl
+    ];
 
-        if (!response.ok) {
-            throw new Error("Fayl alına bilmədi.");
+    let response = null;
+
+    for (const url of targetUrls) {
+        try {
+            const res = await fetch(url, { referrerPolicy: "no-referrer" });
+            if (res.ok) {
+                response = res;
+                break;
+            }
+        } catch (e) {
+            console.warn("CORS attempt failed, trying next...", e);
         }
+    }
 
+    if (!response) {
+        btnElement.disabled = false;
+        btnElement.textContent = "Yenidən cəhd et";
+        if (progressText) {
+            progressText.style.color = "#ff4d4d";
+            progressText.textContent = "Faylı almaq mümkün olmadı. Təkrar klikləyin.";
+        }
+        return;
+    }
+
+    try {
         const contentLength = response.headers.get("content-length");
         const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
         
@@ -136,7 +156,6 @@ async function startDirectDownload(fileUrl, title, format, btnElement) {
         const mimeType = format === "mp3" ? "audio/mpeg" : "video/mp4";
         const blob = new Blob(chunks, { type: mimeType });
         
-        // Kompyuterə/Telefona fayl kimi saxlayırıq
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.style.display = "none";

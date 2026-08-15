@@ -65,15 +65,16 @@ async function convert() {
             throw new Error("Failed query.");
         }
 
+        // Məcburi endirmə üçün backend proxy linki
+        const directDownloadUrl = `/download-file?url=${encodeURIComponent(data.download_url)}&title=${encodeURIComponent(data.title)}&format=${data.format}`;
+
         downloadArea.innerHTML = `
             <div class="download-box">
                 <div class="success">✓ Ready</div>
                 <div class="title">${escapeHtml(data.title)}</div>
                 <a 
                     class="download-button" 
-                    href="${data.download_url}" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    href="${directDownloadUrl}"
                 >
                     Download ${currentFormat.toUpperCase()}
                 </a>

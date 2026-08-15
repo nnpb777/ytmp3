@@ -33,14 +33,19 @@ async function convert() {
         return;
     }
 
+    if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
+        showError("Düzgün YouTube linki daxil edin.");
+        return;
+    }
+
     actionBtn.disabled = true;
     toggleBtn.disabled = true;
-    actionBtn.textContent = "Processing...";
+    actionBtn.textContent = "Gözləyin...";
 
     downloadArea.classList.remove("hidden");
     downloadArea.innerHTML = `
         <div class="status">
-            Please wait. Fetching details...
+            Məlumatlar emal olunur, zəhmət olmasa gözləyin...
         </div>
     `;
 
@@ -53,19 +58,19 @@ async function convert() {
         }
 
         if (data.status !== "success") {
-            throw new Error("Failed Query");
+            throw new Error("Sorğu uğursuz oldu.");
         }
 
+        // Qeyd: Yaratdığımız /download proxy-sinə müraciət edir, target="_blank"
+        // səbəbi ilə brauzer arxa planda endirmə əmrini alır.
         downloadArea.innerHTML = `
             <div class="download-box">
-                <div class="success">✓ Ready</div>
+                <div class="success">✓ Hazırdır</div>
                 <div class="title">${escapeHtml(data.title)}</div>
                 <a 
-                    href="${data.download_url}" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                    href="/download?url=${encodeURIComponent(data.download_url)}&title=${encodeURIComponent(data.title)}&format=${data.format}" 
                     class="download-button"
-                    download="${escapeHtml(data.title)}.${data.format}"
+                    target="_blank"
                 >
                     Download ${currentFormat.toUpperCase()}
                 </a>

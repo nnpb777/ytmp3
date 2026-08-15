@@ -53,7 +53,7 @@ async function convert() {
         }
 
         if (data.status !== "success") {
-            throw new Error("Sorğu uğursuz oldu.");
+            throw new Error("Failed Query");
         }
 
         downloadArea.innerHTML = `

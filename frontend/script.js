@@ -40,7 +40,7 @@ async function convert() {
     downloadArea.classList.remove("hidden");
     downloadArea.innerHTML = `
         <div class="status">
-            Please wait. Fetching details via RapidAPI...
+            Please wait. Fetching details...
         </div>
     `;
 

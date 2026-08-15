@@ -3,7 +3,8 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-import requests
+import re
+import yt_dlp
 
 app = FastAPI()
 
@@ -18,8 +19,6 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "frontend")
 
-COBALT_API_URL = "https://api.cobalt.tools"
-
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
@@ -29,41 +28,48 @@ def convert_video(url: str, format: str = "mp3"):
     if not url:
         raise HTTPException(status_code=400, detail="YouTube URL daxil edin.")
 
-    payload = {
-        "url": url,
-        "downloadMode": "audio" if format == "mp3" else "auto",
-        "audioFormat": "mp3",
-        "videoQuality": "720"
-    }
+    # YouTube URL yoxlanışı
+    if "youtube.com" not in url and "youtu.be" not in url:
+        raise HTTPException(status_code=400, detail="Düzgün YouTube keçidi daxil edin.")
 
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
+    # yt-dlp konfiqurasiyası
+    ydl_opts = {
+        'format': 'bestaudio/best' if format == "mp3" else 'best[ext=mp4]/best',
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 
     try:
-        response = requests.post(COBALT_API_URL, json=payload, headers=headers, timeout=15)
-        
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Video məlumatı alına bilmədi. Linki yoxlayın.")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            
+            title = info.get('title', 'YouTube_Media')
+            clean_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "media"
+            
+            download_url = None
+            
+            # Formatdan asılı olaraq birbaşa yayım linkini tapırıq
+            if 'url' in info:
+                download_url = info['url']
+            elif 'requested_formats' in info and len(info['requested_formats']) > 0:
+                download_url = info['requested_formats'][0]['url']
+            elif 'formats' in info and len(info['formats']) > 0:
+                download_url = info['formats'][-1]['url']
 
-        data = response.json()
-        
-        status = data.get("status")
-        download_url = data.get("url")
-
-        if status in ("tunnel", "redirect", "picker") and download_url:
-            return {
-                "status": "success",
-                "title": data.get("filename", "YouTube_Media"),
-                "download_url": download_url,
-                "format": format
-            }
-        else:
-            raise HTTPException(status_code=400, detail="İndirmə keçidi yaradıla bilmədi.")
+            if download_url:
+                return {
+                    "status": "success",
+                    "title": clean_title,
+                    "download_url": download_url,
+                    "format": format
+                }
+            else:
+                raise HTTPException(status_code=400, detail="İndirmə linki yaradıla bilmədi.")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Xəta baş verdi: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Video məlumatı alına bilmədi: {str(e)}")
 
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
